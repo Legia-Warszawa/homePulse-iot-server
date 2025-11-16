@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from threading import Thread
 from sqlalchemy import text
-from app.services.services import start_eventhub_listener
+# USUŃ TĘ LINIĘ - funkcja nie istnieje!
+# from app.services.services import start_eventhub_listener
 from app.routes import items
 from app.database import engine, Base
 
@@ -21,10 +22,10 @@ async def startup_event():
         Base.metadata.create_all(bind=engine)
         print("✅ Tabele utworzone")
         
-        # EventHub
-        thread = Thread(target=start_eventhub_listener, daemon=True)
-        thread.start()
-        print("🚀 EventHub uruchomiony")
+        # USUŃ TEN BLOK - funkcja nie istnieje!
+        # thread = Thread(target=start_eventhub_listener, daemon=True)
+        # thread.start()
+        print("🚀 Server uruchomiony")
         
     except Exception as e:
         print(f"❌ Błąd: {e}")
