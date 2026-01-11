@@ -18,6 +18,33 @@ consumer_group = os.getenv("EVENTHUB_CONSUMER_GROUP", "$Default")
 # 🧠 Bufor ostatniej wiadomości
 _latest_message = {"status": "brak danych EventHub"} 
 
+# ...existing code...
+def get_history_by_date(model, date_str: str, limit: int = 1000):
+    """
+    Zwraca rekordy dla modelu w przedziale [date 00:00:00, date+1 00:00:00).
+    date_str powinien być w formacie YYYY-MM-DD.
+    """
+    from datetime import datetime, timedelta, time
+    try:
+        date = datetime.fromisoformat(date_str).date()
+    except Exception:
+        raise ValueError("Nieprawidłowy format daty. Użyj YYYY-MM-DD")
+    start = datetime.combine(date, time.min)
+    end = start + timedelta(days=1)
+
+    db = SessionLocal()
+    try:
+        return (
+            db.query(model)
+            .filter(model.timestamp >= start, model.timestamp < end)
+            .order_by(model.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+    finally:
+        db.close()
+# ...existing code...
+
 def on_event(partition_context, event):
     global _latest_message
     try:

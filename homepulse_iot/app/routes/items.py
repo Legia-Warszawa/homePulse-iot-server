@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from app.model.iot_devices import IoTMessageModel
 from app.services import services as service
 from app.database import ESPOutside1, ESPRoom1, ESPFurnanceCO2
@@ -66,18 +66,50 @@ def get_esp_piec_data():
         return {"temperature": furnace.temperature, "timestamp": furnace.timestamp}
     return {"error": "Brak danych z pieca"}
 
+# ======== po dacie ==========
 
-# ===== HISTORIA =====
-@router.get("/history/esp-pokoj")
-def history_esp_pokoj(limit: int = Query(100, gt=0, le=1000)):
-    """Historia pomiarów temperatury z pokoju"""
-    data = service.get_history(ESPRoom1, limit)
+@router.get("/history/esp-pokoj/{date}")
+def history_esp_pokoj_by_date(date: str, limit: int = Query(100, gt=0, le=1000)):
+    """Historia pomiarów temperatury z pokoju dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPRoom1, date, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     return [
         {"temperature": row.temperature, "timestamp": row.timestamp}
-        for row in data
+        for row in rows
     ]
 
+@router.get("/history/esp-zewnatrz/{date}")
+def history_esp_zewnatrz_by_date(date: str, limit: int = Query(100, gt=0, le=1000)):
+    """Historia pomiarów temperatury, wilgotności i ciśnienia z zewnątrz dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPOutside1, date, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
+    return [
+        {
+            "temperature": row.temperature,
+            "humidity": row.humidity,
+            "pressure": row.pressure,
+            "timestamp": row.timestamp,
+        }
+        for row in rows
+    ]
+@router.get("/history/esp-piec/{date}")
+def history_esp_piec_by_date(date: str, limit: int = Query(100, gt=0, le=1000)):
+    """Historia pomiarów temperatury z pieca dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPFurnanceCO2, date, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return [
+        {"temperature": row.temperature, "timestamp": row.timestamp}
+        for row in rows
+    ]
 @router.get("/history/esp-zewnatrz")
 def history_esp_zewnatrz(limit: int = Query(100, gt=0, le=1000)):
     """Historia pomiarów temperatury, wilgotności i ciśnienia z zewnątrz"""
@@ -101,3 +133,55 @@ def history_esp_piec(limit: int = Query(100, gt=0, le=1000)):
         {"temperature": row.temperature, "timestamp": row.timestamp}
         for row in data
     ]
+
+# ===== statystyki (min/max) po dacie =====
+@router.get("/history/esp-pokoj/stats/{date}")
+def stats_esp_pokoj_by_date(date: str):
+    """Min i max temperatura w pokoju dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPRoom1, date, limit=10000)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    temps = [r.temperature for r in rows]
+    if not temps:
+        raise HTTPException(status_code=404, detail="Brak danych dla tej daty")
+    return {
+        "date": date,
+        "min_temperature": min(temps),
+        "max_temperature": max(temps),
+        "count": len(temps),
+    }
+
+@router.get("/history/esp-piec/stats/{date}")
+def stats_esp_piec_by_date(date: str):
+    """Min i max temperatura pieca dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPFurnanceCO2, date, limit=10000)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    temps = [r.temperature for r in rows]
+    if not temps:
+        raise HTTPException(status_code=404, detail="Brak danych dla tej daty")
+    return {
+        "date": date,
+        "min_temperature": min(temps),
+        "max_temperature": max(temps),
+        "count": len(temps),
+    }
+
+@router.get("/history/esp-zewnatrz/stats/{date}")
+def stats_esp_zewnatrz_by_date(date: str):
+    """Min i max temperatura z zewnątrz dla podanej daty (YYYY-MM-DD)"""
+    try:
+        rows = service.get_history_by_date(ESPOutside1, date, limit=10000)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    temps = [r.temperature for r in rows]
+    if not temps:
+        raise HTTPException(status_code=404, detail="Brak danych dla tej daty")
+    return {
+        "date": date,
+        "min_temperature": min(temps),
+        "max_temperature": max(temps),
+        "count": len(temps),
+    }
